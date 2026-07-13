@@ -1,1 +1,9 @@
 
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "io.github.universalcode115.jarvisaipro",
+        "sha256_cert_fingerprints": ["BC:33:52:58:70:2B:28:4A:CE:4C:5B:A5:FE:83:A9:38:4C:30:49:71:70:12:34:70:F0:7D:E9:E0:5C:9F:A6:B5"]
+      }
+    }]
