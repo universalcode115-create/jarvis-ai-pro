@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#6d28d9">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Jarvis AI">
+<title>Jarvis AI Pro</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" id="hljsTheme" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+<link rel="stylesheet" href="css/styles.css">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+<script>
+window.onerror = function(msg, url, line, col, err){
+  var box = document.createElement('div');
+  box.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#b91c1c;color:#fff;font-size:12px;padding:12px;z-index:99999;white-space:pre-wrap;word-break:break-word;';
+  var fileName = (url||'').split('/').pop();
+  box.innerText = 'JS ERROR:\n' + msg + '\nFile: ' + fileName + '  Line: ' + line;
+  document.body.appendChild(box);
+};
+</script>
+
+<div class="offline-banner" id="offlineBanner"><i class="fa-solid fa-wifi"></i> You're offline — replies will resume once reconnected</div>
+
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleMenu()"></div>
+<div class="sidebar" id="sidebar">
+  <div class="sb-title">Navigate</div>
+  <div class="sidebar-item" onclick="switchTab('home','btn-home'); toggleMenu();"><i class="fa-solid fa-house"></i> Home</div>
+  <div class="sidebar-item" onclick="switchTab('chat','btn-chat'); toggleMenu();"><i class="fa-solid fa-comment-dots"></i> Chat</div>
+  <div class="sidebar-item" onclick="switchTab('history','btn-history'); toggleMenu();"><i class="fa-solid fa-clock-rotate-left"></i> Chat History</div>
+  <div class="sidebar-item" onclick="switchTab('gallery','btn-gallery'); toggleMenu();"><i class="fa-solid fa-images"></i> Gallery</div>
+  <div class="sb-title">Account</div>
+  <div class="sidebar-item" onclick="switchTab('profile','btn-profile'); toggleMenu();"><i class="fa-solid fa-user-lock"></i> Profile</div>
+  <div class="sidebar-item" onclick="switchTab('workspace','btn-workspace'); toggleMenu();"><i class="fa-solid fa-sliders"></i> Settings & Stats</div>
+  <div class="sidebar-item" onclick="toggleDarkMode(); toggleMenu();"><i class="fa-solid fa-moon"></i> Toggle Dark Mode</div>
+  <div class="sb-title">Legal</div>
+  <div class="sidebar-item" onclick="openPrivacyPolicy(); toggleMenu();"><i class="fa-solid fa-shield-halved"></i> Privacy Policy</div>
+</div>
+
+<div class="app-header">
+  <div class="brand">
+    <i class="fa-solid fa-arrow-left header-back-btn" id="headerBackBtn" onclick="goBackTab()"></i>
+    <i class="fa-solid fa-bars-staggered menu-trigger" onclick="toggleMenu()"></i>
+    <div class="brand-icon"><i class="fa-solid fa-robot"></i></div>
+    <span>Jarvis AI Pro</span>
+  </div>
+  <div class="header-actions">
+    <div class="header-icon-btn" onclick="switchTab('home','btn-home')" title="Home"><i class="fa-solid fa-house"></i></div>
+    <div class="header-icon-btn" id="exportToggleBtn" onclick="toggleExportMenu()" title="Export"><i class="fa-solid fa-ellipsis-vertical"></i></div>
+    <button class="new-chat-header-btn" onclick="startNewChatSession()"><i class="fa-solid fa-plus"></i> New</button>
+  </div>
+  <div class="export-menu" id="exportMenu">
+    <div class="attach-item" onclick="exportChatAsText()"><i class="fa-solid fa-file-lines"></i> Export as Text</div>
+    <div class="attach-item" onclick="exportChatAsPdf()"><i class="fa-solid fa-file-pdf"></i> Export as PDF</div>
+    <div class="attach-item" onclick="toggleDarkMode()"><i class="fa-solid fa-moon"></i> Toggle Dark Mode</div>
+  </div>
+</div>
+
+<div class="main-content" id="scrollContainer">
+
+  <div id="home" class="app-tab" style="display:block;">
+    <div class="chatgpt-home-wrap">
+      <div class="orb-container"><div class="ai-orb"><div class="ai-orb-face"><div class="ai-orb-eyes"><span></span><span></span></div><div class="ai-orb-smile"></div></div></div></div>
+      <div class="chatgpt-headline" id="welcomeUserText">How can I help you today?</div>
+
+      <button class="chatgpt-start-btn" onclick="goToFreshChat()"><i class="fa-solid fa-comment-dots"></i> Start chatting</button>
+      <div class="chatgpt-home-quick-icons">
+        <div class="chatgpt-quick-icon" onclick="goToFreshChat(); enterImageGenMode();"><i class="fa-solid fa-image"></i><span>Image</span></div>
+        <div class="chatgpt-quick-icon" onclick="goToFreshChat(); toggleAttachmentMenu();"><i class="fa-solid fa-paperclip"></i><span>File</span></div>
+        <div class="chatgpt-quick-icon" onclick="openVoiceChat()"><i class="fa-solid fa-microphone"></i><span>Voice</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="chat" class="app-tab" style="display:none;">
+    <div class="chat-box" id="chatContainer"></div>
+  </div>
+
+  <div id="history" class="app-tab" style="display:none;">
+    <input type="text" class="history-search" id="historySearchInput" placeholder="Search chat history..." oninput="renderHistoryTab()">
+    <div class="grid-title" style="margin-bottom:12px;">Archived Chat Log Streams</div>
+    <div id="historyListContainer"></div>
+  </div>
+
+  <div id="gallery" class="app-tab" style="display:none;">
+    <div class="grid-title" style="margin-bottom:12px;">Saved Generated Images</div>
+    <div id="galleryGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;"></div>
+  </div>
+
+  <div id="workspace" class="app-tab" style="display:none;">
+    <div class="tool-box">
+      <h3><i class="fa-solid fa-chart-simple"></i> Usage Stats</h3>
+      <div class="stat-grid">
+        <div class="stat-box"><div class="stat-num" id="statMessages">0</div><div class="stat-label">Messages Sent</div></div>
+        <div class="stat-box"><div class="stat-num" id="statTokens">0</div><div class="stat-label">Approx. Tokens</div></div>
+        <div class="stat-box"><div class="stat-num" id="statSessions">0</div><div class="stat-label">Saved Sessions</div></div>
+        <div class="stat-box"><div class="stat-num" id="statStatus">Online</div><div class="stat-label">Network Status</div></div>
+      </div>
+    </div>
+
+    <div class="tool-box">
+      <h3><i class="fa-solid fa-sliders"></i> Response Behaviour</h3>
+      <div class="setting-row">
+        <div><div class="setting-label">Answer style</div><div class="setting-sub">Concise = ~3 lines for short questions</div></div>
+        <select class="select-input" id="responseStyleSelect" onchange="saveSettingsFromUI()">
+          <option value="concise">Concise & Slow</option>
+          <option value="detailed">Detailed</option>
+        </select>
+      </div>
+      <div class="setting-row">
+        <div><div class="setting-label">Typing speed</div><div class="setting-sub">How fast replies appear on screen</div></div>
+        <select class="select-input" id="typingSpeedSelect" onchange="saveSettingsFromUI()">
+          <option value="slow">Slow</option>
+          <option value="normal">Normal</option>
+          <option value="fast">Fast</option>
+        </select>
+      </div>
+      <div class="setting-row">
+        <div><div class="setting-label">Voice output</div><div class="setting-sub">Read AI replies aloud</div></div>
+        <label class="switch"><input type="checkbox" id="voiceOutputToggle" onchange="saveSettingsFromUI()"><span class="slider-toggle"></span></label>
+      </div>
+      <div class="setting-row">
+        <div><div class="setting-label">Voice type</div><div class="setting-sub">Which voice speaks the replies</div></div>
+        <select class="select-input" id="voiceGenderSelect" onchange="saveSettingsFromUI()">
+          <option value="female">Female</option>
+          <option value="male">Male</option>
+          <option value="default">Device default</option>
+        </select>
+      </div>
+      <div class="setting-row">
+        <div><div class="setting-label">Personality</div><div class="setting-sub">How Jarvis talks to you</div></div>
+        <select class="select-input" id="personalityModeSelect" onchange="saveSettingsFromUI()">
+          <option value="normal">Normal</option>
+          <option value="jarvis">Jarvis (Iron Man style)</option>
+          <option value="krishna">Wise & Calm</option>
+          <option value="maharaj">Respectful & Spiritual</option>
+        </select>
+      </div>
+      <div class="setting-row" style="flex-direction:column; align-items:flex-start; gap:8px;">
+        <div><div class="setting-label">Custom personality / system prompt</div></div>
+        <textarea class="textarea-input" id="systemPromptInput" onblur="saveSettingsFromUI()" placeholder="e.g. You are Jarvis, witty but precise..."></textarea>
+      </div>
+    </div>
+
+    <div class="tool-box">
+      <h3><i class="fa-solid fa-palette"></i> Appearance</h3>
+      <div class="setting-row">
+        <div><div class="setting-label">Dark mode</div></div>
+        <label class="switch"><input type="checkbox" id="darkModeToggle" onchange="toggleDarkMode()"><span class="slider-toggle"></span></label>
+      </div>
+    </div>
+
+    <div class="tool-box">
+      <h3><i class="fa-solid fa-circle-info"></i> About</h3>
+      <p class="desc">Jarvis AI Pro — your personal assistant for chat, voice, images, and documents.</p>
+    </div>
+  </div>
+
+  <div id="profile" class="app-tab" style="display:none;">
+    <div class="tool-box" id="guestBanner" style="display:none; background:linear-gradient(135deg,var(--accent-2),var(--accent)); color:#fff;">
+      <h3 style="color:#fff;"><i class="fa-solid fa-user-large"></i> Guest Mode</h3>
+      <p class="desc" style="color:rgba(255,255,255,0.85);">You're using Jarvis as a guest — chats stay only on this device. Sign in below to sync across devices.</p>
+    </div>
+    <div class="tool-box" id="authFormSection">
+      <h3><i class="fa-solid fa-user-lock"></i> <span id="authFormTitle">Identity Core</span></h3>
+      <div class="google-btn-wrap" style="padding-top:0;">
+        <button class="btn-ghost" style="margin-top:0; display:flex; align-items:center; justify-content:center; gap:10px;" onclick="signInWithGoogleFirebase()">
+          <i class="fa-brands fa-google" style="color:#ea4335;"></i> Continue with Google
+        </button>
+      </div>
+      <div class="or-divider" id="profileDivider" style="padding:0 0 10px 0;">or use email</div>
+      <input type="text" class="auth-input" id="authNameInput" placeholder="Full Name" style="display:none;">
+      <input type="email" class="auth-input" id="authEmailInput" placeholder="System ID Email">
+      <input type="password" class="auth-input" id="authPassInput" placeholder="Access Cipher Token">
+      <button class="btn-prime" id="authSubmitBtn" onclick="handleAuth('login')">Login Securely</button>
+      <div class="auth-toggle-row">
+        <span id="authToggleText">New here?</span>
+        <span class="auth-toggle-link" id="authToggleLink" onclick="toggleAuthMode()">Create account</span>
+      </div>
+      <button class="btn-ghost" id="backToOneTapBtn" style="display:none;" onclick="openOneTap()">← Back to accounts</button>
+    </div>
+    <div class="tool-box" id="profileActiveSection" style="display:none;">
+      <h3><i class="fa-solid fa-circle-user"></i> Active Account</h3>
+      <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+        <div class="onetap-avatar" id="profileAvatar" style="width:48px;height:48px;font-size:18px;"></div>
+        <div>
+          <div style="font-weight:700; font-size:15px;" id="profileNameDisplay"></div>
+          <div style="font-size:12px; color:var(--text-muted);" id="activeEmailDisplay"></div>
+        </div>
+      </div>
+      <button class="btn-ghost" onclick="openOneTap()"><i class="fa-solid fa-user-group"></i> Switch Account</button>
+      <button class="btn-prime" style="background:var(--danger); margin-top:8px;" onclick="handleAuth('logout')"><i class="fa-solid fa-right-from-bracket"></i> Logout</button>
+    </div>
+  </div>
+
+</div>
+
+<div class="controls-container">
+  <div class="attachment-menu" id="attachMenu">
+    <div class="attach-item" onclick="triggerHardware('gallery')"><i class="fa-solid fa-image"></i> Upload Photo</div>
+    <div class="attach-item" onclick="triggerHardware('photo')"><i class="fa-solid fa-camera"></i> Snap Photo</div>
+    <div class="attach-item" onclick="triggerHardware('video')"><i class="fa-solid fa-video"></i> Record Video</div>
+    <div class="attach-item" onclick="triggerHardware('file')"><i class="fa-solid fa-file-pdf"></i> Upload File / PDF / DOCX</div>
+  </div>
+  <div class="image-gen-hint-row" id="imageGenHintRow" style="display:none;">
+    <i class="fa-solid fa-wand-magic-sparkles"></i>
+    <span>Creating an image — describe what you want, then send</span>
+    <i class="fa-solid fa-xmark image-gen-hint-remove" onclick="exitImageGenMode()"></i>
+  </div>
+  <div class="pending-image-row" id="pendingImageRow" style="display:none;">
+    <img id="pendingImagePreview" src="" alt="Selected photo">
+    <div class="pending-image-hint">Ask about it, or describe an edit — then send</div>
+    <i class="fa-solid fa-xmark pending-image-remove" onclick="clearPendingImage()"></i>
+  </div>
+  <div class="chatgpt-input-row">
+    <input type="file" id="nativeGalleryIn" accept="image/*" style="display:none;" onchange="processMediaAttachment(this,'Photo')">
+    <input type="file" id="nativePhotoIn" accept="image/*" capture="environment" style="display:none;" onchange="processMediaAttachment(this,'Photo')">
+    <input type="file" id="nativeVideoIn" accept="video/*" capture="environment" style="display:none;" onchange="processMediaAttachment(this,'Video')">
+    <input type="file" id="nativeFileIn" accept=".pdf,.doc,.docx,.txt,image/*" style="display:none;" onchange="processMediaAttachment(this,'File')">
+    <button class="icon-btn plus-btn" id="plusToggleBtn" onclick="toggleAttachmentMenu()"><i class="fa-solid fa-plus"></i></button>
+    <input type="text" id="appInputBox" placeholder="Ask Jarvis Pro..." enterkeyhint="send" onkeydown="if(event.key==='Enter'){executeChatAction();}">
+    <button class="icon-btn" id="voiceChatBtn" onclick="openVoiceChat()" title="Voice Chat"><i class="fa-solid fa-headset"></i></button>
+    <button class="icon-btn" id="micBtn" onclick="startVoiceInput()"><i class="fa-solid fa-microphone"></i></button>
+    <button class="chatgpt-wave-btn" onclick="executeChatAction()"><i class="fa-solid fa-arrow-up"></i></button>
+  </div>
+</div>
+
+<div class="toast" id="toastBox"></div>
+
+<div class="onetap-overlay" id="oneTapOverlay">
+  <div class="onetap-card">
+    <div class="onetap-header"><i class="fa-solid fa-robot"></i><span>Jarvis AI Pro</span><i class="fa-solid fa-xmark onetap-close" onclick="closeOneTap()"></i></div>
+    <div class="onetap-title">Choose an account</div>
+    <div class="onetap-sub">to continue to Jarvis AI Pro</div>
+    <div class="google-btn-wrap">
+      <button class="btn-ghost" style="margin-top:0; display:flex; align-items:center; justify-content:center; gap:10px;" onclick="signInWithGoogleFirebase()">
+        <i class="fa-brands fa-google" style="color:#ea4335;"></i> Continue with Google
+      </button>
+    </div>
+    <div class="or-divider" id="oneTapDivider" style="display:none;">saved on this device</div>
+    <div id="oneTapAccountList"></div>
+    <div class="onetap-add-row" onclick="openAuthForm('signup', true)"><div class="onetap-add-icon"><i class="fa-solid fa-plus"></i></div>Continue with email instead</div>
+    <div class="onetap-add-row" onclick="continueAsGuest()"><div class="onetap-add-icon"><i class="fa-solid fa-user-large"></i></div>Continue as Guest</div>
+    <div class="onetap-footer">To continue, Jarvis will sign you in with the selected account on this device.</div>
+  </div>
+</div>
+
+<!-- VOICE CHAT MODE — continuous talk with the AI, spoken replies -->
+<div class="voice-overlay" id="voiceOverlay">
+  <i class="fa-solid fa-xmark voice-close" onclick="closeVoiceChat()"></i>
+  <div style="flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+    <div class="voice-orb-big" id="voiceOrb" onclick="voiceChatToggleListen()"></div>
+    <div class="voice-status" id="voiceStatus">Tap the mic to start talking</div>
+    <div class="voice-transcript" id="voiceTranscript"></div>
+  </div>
+  <button class="voice-stop-btn" id="voiceMicBtn" onclick="voiceChatToggleListen()"><i class="fa-solid fa-microphone" id="voiceMicIcon"></i></button>
+</div>
+
+<!-- PRIVACY POLICY -->
+<div class="policy-overlay" id="policyOverlay">
+  <div class="policy-card">
+    <h2><i class="fa-solid fa-shield-halved"></i> Privacy Policy</h2>
+    <p>Last updated: 2026. This policy explains what Jarvis AI Pro does and does not do with your information.</p>
+
+    <h4>What we collect</h4>
+    <ul>
+      <li>Account info: your name, email, and profile picture (via Google Sign-In or email/password)</li>
+      <li>Your chat messages and generated images, so your history syncs across your devices</li>
+      <li>Basic usage stats (message counts) stored on your device</li>
+    </ul>
+
+    <h4>What we do with it</h4>
+    <ul>
+      <li>Store your chats securely in Firebase so you can access them later or on another device</li>
+      <li>Send your messages to AI providers (Groq) solely to generate a reply to you</li>
+      <li>Nothing is sold. Nothing is shared with advertisers.</li>
+    </ul>
+
+    <h4>What we don't do</h4>
+    <ul>
+      <li>We don't read your chats for advertising or profiling</li>
+      <li>We don't share your personal data with third parties beyond what's needed to generate AI replies (Groq) or generate images (a public image API)</li>
+      <li>We don't sell your data to anyone</li>
+      <li>Voice recognition and text-to-speech run in your browser — audio is not stored on our servers</li>
+    </ul>
+
+    <h4>Your choices</h4>
+    <ul>
+      <li>You can delete individual chats anytime from History</li>
+      <li>You can log out anytime from Profile, which ends your session on this device</li>
+      <li>Uploaded files/images are processed to generate a response and are not permanently stored beyond your chat history</li>
+    </ul>
+
+    <h4>Contact</h4>
+    <p>Questions about this policy can be raised via the app's feedback channel.</p>
+
+    <button class="policy-close-btn" onclick="closePrivacyPolicy()">Close</button>
+  </div>
+</div>
+
+  <div id="imgLightbox" onclick="closeImageLightbox()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:5000;align-items:center;justify-content:center;">
+    <img id="imgLightboxImg" src="" style="max-width:94%;max-height:88%;border-radius:10px;object-fit:contain;">
+    <i class="fa-solid fa-xmark" onclick="closeImageLightbox()" style="position:absolute;top:18px;right:18px;color:#fff;font-size:26px;padding:8px;"></i>
+  </div>
+
+<script src="js/config.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/firebase.js"></script>
+<script src="js/settings.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/chat-render.js"></script>
+<script src="js/history.js"></script>
+<script src="js/gallery.js"></script>
+<script src="js/voice.js"></script>
+<script src="js/image.js"></script>
+<script src="js/chat-engine.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
