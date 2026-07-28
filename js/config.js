@@ -2,9 +2,9 @@
    CONFIG
    ===================================================== */
 // Text replies now go through a secure Cloudflare Worker proxy — the real
-// Groq API key stays server-side and is never exposed in this public code.
-var GROQ_PROXY_URL = "https://jarvis-groq-proxy.rk24363ywhsh.workers.dev/";
-var targetAiModel = "groq/compound"; // handles normal chat + automatic real-time web search when needed
+// Gemini API key stays server-side and is never exposed in this public code.
+var GEMINI_PROXY_URL = "https://jarvis-groq-proxy.rk24363ywhsh.workers.dev/";
+var targetAiModel = "gemini/flash-latest"; // Gemini Flash model for fast, quality responses
 
 // Google Sign-In now uses Firebase Authentication's built-in Google provider
 // directly (no separate Client ID needed) — see signInWithGoogleFirebase().
@@ -56,4 +56,3 @@ var usage = Object.assign({messages:0, tokens:0}, JSON.parse(localStorage.getIte
 
 var AVATAR_COLORS = ['#0284c7','#10b981','#f59e0b','#ef4444','#6366f1','#ec4899','#14b8a6'];
 var recognizer = null, isListening = false;
-
