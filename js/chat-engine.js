@@ -145,7 +145,7 @@ function executeChatAction(){
 }
 
 function handleImageGeneration(prompt, id, inputImageDataUrl){
-  var hasProxy = GROQ_PROXY_URL && GROQ_PROXY_URL.indexOf('YOUR_WORKER_URL')===-1;
+  var hasProxy = GEMINI_PROXY_URL && GEMINI_PROXY_URL.indexOf('YOUR_WORKER_URL')===-1;
   var el = document.getElementById(id);
   if(!el) return;
 
@@ -176,7 +176,7 @@ function handleImageGeneration(prompt, id, inputImageDataUrl){
   var payload = { imagegen:true, prompt: prompt };
   if(inputImageDataUrl) payload.inputImage = inputImageDataUrl;
 
-  fetch(GROQ_PROXY_URL, {
+  fetch(GEMINI_PROXY_URL, {
     method:"POST",
     headers:{ "Content-Type":"application/json" },
     body: JSON.stringify(payload)
@@ -243,7 +243,7 @@ function stopStream(id){
 }
 
 function fetchAiReply(userText, id){
-  var hasProxy = GROQ_PROXY_URL && GROQ_PROXY_URL.indexOf('YOUR_WORKER_URL')===-1;
+  var hasProxy = GEMINI_PROXY_URL && GEMINI_PROXY_URL.indexOf('YOUR_WORKER_URL')===-1;
   var short = isShortQuestion(userText);
   var isCode = isCodeQuestion(userText);
   var maxTok = isCode ? 900 : (settings.responseStyle==='concise' ? (short ? 180 : 380) : 700);
@@ -296,7 +296,7 @@ function fetchAiReply(userText, id){
     usage.tokens += Math.round(fullText.length/4); persistUsage();
   }
 
-  fetch(GROQ_PROXY_URL, {
+  fetch(GEMINI_PROXY_URL, {
     method:"POST",
     headers:{ "Content-Type":"application/json" },
     body: JSON.stringify({ model: targetAiModel, messages: payload, max_tokens: maxTok, stream:true }),
@@ -363,7 +363,7 @@ function fetchAiReplyNonStream(userText, id, maxTok){
   var payload = buildConversationPayload(userText);
   var el = document.getElementById(id);
   if(!el) return;
-  fetch(GROQ_PROXY_URL, {
+  fetch(GEMINI_PROXY_URL, {
     method:"POST",
     headers:{ "Content-Type":"application/json" },
     body: JSON.stringify({ model: targetAiModel, messages: payload, max_tokens: maxTok || 500, stream:false })
@@ -383,4 +383,3 @@ function fetchAiReplyNonStream(userText, id, maxTok){
     revealTextIntoElement(id, friendlyErrorMessage(), 'normal');
   });
 }
-
