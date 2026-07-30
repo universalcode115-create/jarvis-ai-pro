@@ -1,13 +1,15 @@
 /* =====================================================
    CONFIG
    ===================================================== */
-// Text replies now go through a secure Cloudflare Worker proxy — the real
-// Gemini API key stays server-side and is never exposed in this public code.
-var GEMINI_PROXY_URL = "https://jarvis-groq-proxy.rk24363ywhsh.workers.dev/";
-var targetAiModel = "gemini/flash-latest"; // Gemini Flash model for fast, quality responses
+// Yahan aapka Cloudflare Worker URL hai
+var MY_WORKER_URL = "https://jarvis-groq-proxy.rk24363ywhsh.workers.dev/";
 
-// Google Sign-In now uses Firebase Authentication's built-in Google provider
-// directly (no separate Client ID needed) — see signInWithGoogleFirebase().
+// Dono variables define kiye hain taaki history.js aur chat_engine.js dono ko apna URL mil jaye
+var GROQ_PROXY_URL = MY_WORKER_URL;
+var GEMINI_PROXY_URL = MY_WORKER_URL;
+
+// Gemini Flash model for fast, quality responses
+var targetAiModel = "gemini-1.5-flash"; 
 
 // =====================================================
 // FIREBASE CONFIG — real backend (Authentication + Firestore database)
@@ -21,18 +23,16 @@ var firebaseConfig = {
   appId: "1:866337220940:web:17f207b7ebcd6e992487e9",
   measurementId: "G-4WBLLN31HD"
 };
+
 var fbAuth = null, fbDb = null;
 try {
   firebase.initializeApp(firebaseConfig);
   fbAuth = firebase.auth();
   fbDb = firebase.firestore();
 } catch (e) {
-  // Firebase SDK didn't load (blocked network, ad-blocker, slow connection,
-  // etc). Cloud sync/login just won't work this session — but the rest of
-  // the app (chat, voice, settings) must still start up normally instead
-  // of dying here and taking every function below with it.
   console.warn('Firebase failed to initialize — cloud sync disabled for this session.', e);
 }
+
 var currentUid = null;
 var cloudSyncReady = false;
 
