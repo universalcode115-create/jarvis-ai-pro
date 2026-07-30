@@ -2,7 +2,7 @@
    CONFIG
    ===================================================== */
 // Yahan aapka Cloudflare Worker URL hai
-var MY_WORKER_URL = "https://jarvis-groq-proxy.rk24363ywhsh.workers.dev/";
+var MY_WORKER_URL = "https://jarvis-groq-proxy.rk24363ywhsh.workers.dev";
 
 // Dono variables define kiye hain taaki history.js aur chat_engine.js dono ko apna URL mil jaye
 var GROQ_PROXY_URL = MY_WORKER_URL;
