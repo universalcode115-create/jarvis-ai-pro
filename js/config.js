@@ -1,15 +1,14 @@
 /* =====================================================
    CONFIG - GLOBAL VARIABLES
    ===================================================== */
-// Naya Alert taaki humein pata chale naya code load hua hai
-alert("Jarvis is Ready!");
-
-// Yahan aapka Cloudflare Worker URL hai (Bina aakhri slash ke)
+// Cloudflare Worker URL (Bina aakhri slash ke)
 var MY_WORKER_URL = "https://jarvis-groq-proxy.rk24363ywhsh.workers.dev";
 
 var GROQ_PROXY_URL = MY_WORKER_URL;
 var GEMINI_PROXY_URL = MY_WORKER_URL;
-var targetAiModel = "gemini-1.5-flash"; 
+
+// Groq ka sabse smart aur fast model
+var targetAiModel = "llama-3.1-70b-versatile"; 
 
 // =====================================================
 // FIREBASE CONFIG
@@ -56,4 +55,6 @@ var recognizer = null, isListening = false;
 
 function imageGenUrl(prompt){
   return "https://image.pollinations.ai/prompt/" + encodeURIComponent(prompt) + "?width=768&height=768&nologo=true";
-   }
+}
+
+console.log("Jarvis Optimized for Groq!");
