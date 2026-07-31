@@ -1,14 +1,14 @@
 /* =====================================================
    CONFIG - GLOBAL VARIABLES
    ===================================================== */
-// Yahan aapka Cloudflare Worker URL hai
+// Naya Alert taaki humein pata chale naya code load hua hai
+alert("Jarvis is Ready!");
+
+// Yahan aapka Cloudflare Worker URL hai (Bina aakhri slash ke)
 var MY_WORKER_URL = "https://jarvis-groq-proxy.rk24363ywhsh.workers.dev";
 
-// Dono variables define kiye hain taaki history.js aur chat_engine.js dono chalein
 var GROQ_PROXY_URL = MY_WORKER_URL;
 var GEMINI_PROXY_URL = MY_WORKER_URL;
-
-// Gemini Flash model for fast, quality responses
 var targetAiModel = "gemini-1.5-flash"; 
 
 // =====================================================
@@ -37,7 +37,7 @@ try {
 }
 
 /* =====================================================
-   STATE & STORAGE (Zaroori Variables)
+   STATE & STORAGE
    ===================================================== */
 var isLoggedIn = false, currentUserEmail = "", currentUserName = "", authMode = "login";
 var activeChatMessages = JSON.parse(localStorage.getItem('jarvis_active_chat')) || [];
@@ -54,10 +54,6 @@ var usage = Object.assign({messages:0, tokens:0}, JSON.parse(localStorage.getIte
 var AVATAR_COLORS = ['#0284c7','#10b981','#f59e0b','#ef4444','#6366f1','#ec4899','#14b8a6'];
 var recognizer = null, isListening = false;
 
-// Image Generation URL Helper
 function imageGenUrl(prompt){
   return "https://image.pollinations.ai/prompt/" + encodeURIComponent(prompt) + "?width=768&height=768&nologo=true";
-}
-
-// Confirm Config Loaded
-console.log("Jarvis Config Loaded Successfully!");
+   }
