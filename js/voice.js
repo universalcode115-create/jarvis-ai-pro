@@ -14,15 +14,13 @@ var fullReplyText = '', currentBuffer = '';
    ===================================================== */
 function startVoiceInput(){
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if(!SR){ showToast('Voice input not supported in this browser'); return; }
+  if(!SR){ showToast('Voice input not supported'); return; }
   if(isListening){ if(recognizer) recognizer.stop(); return; }
   
   recognizer = new SR();
   recognizer.lang = 'en-IN';
   recognizer.interimResults = false;
-  recognizer.maxAlternatives = 1;
   isListening = true;
-  
   document.getElementById('micBtn').classList.add('mic-active');
   showToast('Listening...');
   
@@ -30,7 +28,6 @@ function startVoiceInput(){
     var text = e.results[0][0].transcript;
     document.getElementById('appInputBox').value = text;
   };
-  recognizer.onerror = function(){ showToast('Could not hear you clearly'); };
   recognizer.onend = function(){ 
     isListening = false; 
     document.getElementById('micBtn').classList.remove('mic-active'); 
@@ -43,15 +40,13 @@ function startVoiceInput(){
    ===================================================== */
 function openVoiceChat(){
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if(!SR){ showToast('Voice chat needs speech recognition support'); return; }
-  
+  if(!SR){ showToast('Voice chat needs speech recognition'); return; }
   voiceChatActive = true;
   document.getElementById('voiceOverlay').classList.add('show');
   document.getElementById('voiceStatus').innerText = 'Jarvis is ready. Start talking...';
   document.getElementById('voiceTranscript').innerText = '';
   document.getElementById('voiceOrb').className = 'voice-orb-big';
-  
-  voiceChatListenOnce(); // Automatically start listening
+  voiceChatListenOnce();
 }
 
 function closeVoiceChat(){
@@ -81,7 +76,6 @@ function voiceChatToggleListen(){
 function voiceChatListenOnce(){
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if(!SR || !voiceChatActive) return;
-  
   window.speechSynthesis.cancel();
   voiceChatListening = true;
   voiceChatRecognizer = new SR();
@@ -97,46 +91,25 @@ function voiceChatListenOnce(){
     document.getElementById('voiceTranscript').innerText = 'You: ' + text;
     voiceChatSendAndSpeak(text);
   };
-  
-  voiceChatRecognizer.onerror = function(){
-    if(voiceChatActive) document.getElementById('voiceStatus').innerText = 'Tap the mic to speak...';
-  };
-  
   voiceChatRecognizer.onend = function(){
     voiceChatListening = false;
     if(document.getElementById('voiceMicIcon')) document.getElementById('voiceMicIcon').className = 'fa-solid fa-microphone';
     if(voiceChatActive && !speakingNow) document.getElementById('voiceOrb').className = 'voice-orb-big';
   };
-  
   voiceChatRecognizer.start();
 }
 
 function voiceChatSendAndSpeak(text){
   if(!voiceChatActive) return;
-  
-  // Reset state for new turn
-  fullReplyText = ''; currentBuffer = '';
-  sentenceQueue = []; speakingNow = false; streamDone = false;
-  
   document.getElementById('voiceStatus').innerText = 'Thinking...';
   document.getElementById('voiceOrb').className = 'voice-orb-big';
 
-  // 1. Image Check
-  if(typeof detectImagePrompt === 'function'){
-    var imagePrompt = detectImagePrompt(text);
-    if(imagePrompt){
-      var id = 'ai-voice-' + Date.now();
-      appendAiPlaceholder(id);
-      handleImageGeneration(imagePrompt, id);
-      speakSimpleReply("Here is the image I created for you.");
-      return;
-    }
-  }
-
-  // 2. Normal Chat
   saveAndAppendMessage('user', text);
   var aiMsgId = 'ai-voice-' + Date.now();
   appendAiPlaceholder(aiMsgId);
+
+  fullReplyText = ''; currentBuffer = '';
+  sentenceQueue = []; speakingNow = false; streamDone = false;
 
   var payload = buildVoicePayload(text);
   
@@ -170,7 +143,6 @@ function voiceChatSendAndSpeak(text){
             if(piece){
               fullReplyText += piece;
               currentBuffer += piece;
-              // Split by sentence markers
               let m = currentBuffer.match(/^(.*?[.!?।\n,])\s+/);
               if(m){
                 enqueueSentence(m[1]);
@@ -182,31 +154,15 @@ function voiceChatSendAndSpeak(text){
       });
     }
     
-    // Final UI Sync
     var el = document.getElementById(aiMsgId);
     if(el && typeof renderMarkdown === 'function'){
       el.querySelector('.msg-body').innerHTML = renderMarkdown(fullReplyText);
-      el.setAttribute('data-raw', encodeURIComponent(fullReplyText));
-      var toolsWrap = document.createElement('div');
-      toolsWrap.innerHTML = messageToolsHtml(aiMsgId);
-      el.appendChild(toolsWrap.firstChild);
     }
-    activeChatMessages.push({sender:'ai', text:fullReplyText});
-    localStorage.setItem('jarvis_active_chat', JSON.stringify(activeChatMessages));
   })
   .catch(function(err){
     console.error(err);
-    speakSimpleReply("I'm sorry, I'm having trouble connecting right now.");
+    document.getElementById('voiceStatus').innerText = 'Error connecting...';
   });
-}
-
-function speakSimpleReply(text){
-    if(!voiceChatActive) return;
-    document.getElementById('voiceStatus').innerText = 'Speaking...';
-    document.getElementById('voiceOrb').className = 'voice-orb-big speaking';
-    var utter = new SpeechSynthesisUtterance(text);
-    utter.onend = function(){ if(voiceChatActive) voiceChatListenOnce(); };
-    window.speechSynthesis.speak(utter);
 }
 
 function enqueueSentence(s){
@@ -256,7 +212,7 @@ function startInterruptWatcher(){
     interruptWatcher.interimResults = true;
     interruptWatcher.onresult = function(e){
       var heard = e.results[e.results.length-1][0].transcript.trim();
-      if(heard.split(/\s+/).length >= 2){ // User spoke at least 2 words
+      if(heard.split(/\s+/).length >= 2){ 
         window.speechSynthesis.cancel();
         sentenceQueue = [];
         speakingNow = false;
@@ -272,9 +228,6 @@ function stopInterruptWatcher(){
   if(interruptWatcher){ try{ interruptWatcher.stop(); }catch(e){} interruptWatcher = null; }
 }
 
-/* =====================================================
-   3. HELPER UTILITIES
-   ===================================================== */
 function cleanForSpeech(text){
   return text
     .replace(/\*\*\*(.*?)\*\*\*/g, '$1')
@@ -300,3 +253,4 @@ function buildVoicePayload(latestUserText){
   else base.unshift({role:'system', content:systemMsg});
   return base;
 }
+   
