@@ -34,7 +34,6 @@ function openVoiceChat(){
   document.getElementById('voiceStatus').innerText = 'Jarvis is ready. Start talking...';
   document.getElementById('voiceTranscript').innerText = '';
   document.getElementById('voiceOrb').className = 'voice-orb-big';
-  // ChatGPT style: Automatically start listening when opened
   voiceChatListenOnce();
 }
 
@@ -72,7 +71,6 @@ function voiceChatListenOnce(){
   document.getElementById('voiceStatus').innerText = 'Listening...';
   if(document.getElementById('voiceMicIcon')) document.getElementById('voiceMicIcon').className = 'fa-solid fa-stop';
 
-  voiceChatRecognizer.onstart = function(){ window.speechSynthesis.cancel(); };
   voiceChatRecognizer.onresult = function(e){
     var text = e.results[0][0].transcript;
     document.getElementById('voiceTranscript').innerText = 'You: ' + text;
@@ -111,10 +109,11 @@ function cleanForSpeech(text){
 
 function buildVoicePayload(latestUserText){
   var base = buildConversationPayload(latestUserText);
-  base[0] = { role:'system', content: base[0].content + " This is a LIVE spoken voice conversation. Answer in natural, clear spoken sentences only. No bullet points, no markdown. Be extremely brief (2-4 short sentences). Talk like a real person." };
+  base[0] = { role:'system', content: base[0].content + " This is a LIVE voice conversation. Answer in natural, clear spoken sentences only. Be very brief (2-3 sentences)." };
   return base;
 }
 
+// Global variables for tracking speech state
 var sentenceQueue = [];
 var speakingNow = false;
 var fullReplyText = '';
@@ -228,7 +227,6 @@ function voiceChatSendAndSpeak(text){
     startInterruptWatcher();
   }
 
-  var el = document.getElementById(id);
   var buffer = '';
   fetch(GROQ_PROXY_URL, {
     method:"POST",
@@ -247,9 +245,8 @@ function voiceChatSendAndSpeak(text){
           if(buffer.trim()) enqueueSentence(buffer);
           if(!fullReplyText.trim()) speakReply("Sorry, I couldn't generate a reply.");
           else {
-            if(el){
-              el.querySelector('.msg-body').innerHTML = renderMarkdown(fullReplyText);
-            }
+            var el = document.getElementById(id);
+            if(el) el.querySelector('.msg-body').innerHTML = renderMarkdown(fullReplyText);
             activeChatMessages.push({sender:'ai', text:fullReplyText});
             localStorage.setItem('jarvis_active_chat', JSON.stringify(activeChatMessages));
           }
@@ -265,12 +262,10 @@ function voiceChatSendAndSpeak(text){
           if(!jsonStr || jsonStr === '[DONE]') return;
           try{
             var obj = JSON.parse(jsonStr);
-            var cand = obj.candidates && obj.candidates[0];
-            var piece = cand && cand.content && cand.content.parts && cand.content.parts[0] && cand.content.parts[0].text;
+            var piece = obj.candidates?.[0]?.content?.parts?.[0]?.text;
             if(piece){
               fullReplyText += piece;
               buffer += piece;
-              // ChatGPT style: Split on punctuation for faster speech start
               var m = buffer.match(/^(.*?[.!?।\n,])\s+/);
               if(m){
                 enqueueSentence(m[1]);
@@ -291,19 +286,6 @@ function voiceChatSendAndSpeak(text){
     return pump();
   })
   .catch(function(err){
-    fetch(GROQ_PROXY_URL, {
-      method:"POST",
-      headers:{ "Content-Type":"application/json" },
-      body: JSON.stringify({ model: targetAiModel, messages: payload, max_tokens: 400, stream:false })
-    })
-    .then(function(res){ return res.json(); })
-    .then(function(data){
-      var reply = "Sorry, I couldn't generate a reply.";
-      if(data && data.candidates && data.candidates[0] && data.candidates[0].content) {
-        reply = data.candidates[0].content.parts[0].text;
-      }
-      speakReply(reply);
-    })
-    .catch(function(){ speakReply("Connection lost. Please try again."); });
+    speakReply("Connection lost. Please try again.");
   });
-  }
+}
