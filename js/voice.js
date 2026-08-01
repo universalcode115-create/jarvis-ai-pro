@@ -3,21 +3,37 @@
    ===================================================== */
 function startVoiceInput(){
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if(!SR){ showToast('Voice input not supported in this browser'); return; }
-  if(isListening){ if(recognizer) recognizer.stop(); return; }
+  if(!SR){ 
+    if(typeof showToast === 'function') showToast('Voice input not supported'); 
+    return; 
+  }
+  if(typeof isListening !== 'undefined' && isListening){ 
+    if(recognizer && typeof recognizer.stop === 'function') recognizer.stop(); 
+    return; 
+  }
+  
   recognizer = new SR();
   recognizer.lang = 'en-IN';
   recognizer.interimResults = false;
   recognizer.maxAlternatives = 1;
   isListening = true;
-  document.getElementById('micBtn').classList.add('mic-active');
-  showToast('Listening...');
+  
+  var micBtn = document.getElementById('micBtn');
+  if(micBtn) micBtn.classList.add('mic-active');
+  if(typeof showToast === 'function') showToast('Listening...');
+
   recognizer.onresult = function(e){
     var text = e.results[0][0].transcript;
-    document.getElementById('appInputBox').value = text;
+    var input = document.getElementById('appInputBox');
+    if(input) input.value = text;
   };
-  recognizer.onerror = function(){ showToast('Could not hear you clearly'); };
-  recognizer.onend = function(){ isListening=false; document.getElementById('micBtn').classList.remove('mic-active'); };
+  recognizer.onerror = function(){ 
+    if(typeof showToast === 'function') showToast('Could not hear you'); 
+  };
+  recognizer.onend = function(){ 
+    isListening = false; 
+    if(micBtn) micBtn.classList.remove('mic-active'); 
+  };
   recognizer.start();
 }
 
@@ -28,12 +44,23 @@ var voiceChatRecognizer = null, voiceChatActive = false, voiceChatListening = fa
 
 function openVoiceChat(){
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if(!SR){ showToast('Voice chat needs a browser with speech recognition support'); return; }
+  if(!SR){ 
+    if(typeof showToast === 'function') showToast('Speech not supported'); 
+    return; 
+  }
   voiceChatActive = true;
-  document.getElementById('voiceOverlay').classList.add('show');
-  document.getElementById('voiceStatus').innerText = 'Jarvis is ready. Start talking...';
-  document.getElementById('voiceTranscript').innerText = '';
-  document.getElementById('voiceOrb').className = 'voice-orb-big';
+  var overlay = document.getElementById('voiceOverlay');
+  if(overlay) overlay.classList.add('show');
+  
+  var status = document.getElementById('voiceStatus');
+  if(status) status.innerText = 'Jarvis is ready. Start talking...';
+  
+  var transcript = document.getElementById('voiceTranscript');
+  if(transcript) transcript.innerText = '';
+  
+  var orb = document.getElementById('voiceOrb');
+  if(orb) orb.className = 'voice-orb-big';
+  
   voiceChatListenOnce();
 }
 
@@ -42,7 +69,8 @@ function closeVoiceChat(){
   window.speechSynthesis.cancel();
   if(voiceChatRecognizer){ try{ voiceChatRecognizer.stop(); }catch(e){} }
   voiceChatListening = false;
-  document.getElementById('voiceOverlay').classList.remove('show');
+  var overlay = document.getElementById('voiceOverlay');
+  if(overlay) overlay.classList.remove('show');
 }
 
 function voiceChatToggleListen(){
@@ -67,23 +95,30 @@ function voiceChatListenOnce(){
   voiceChatRecognizer.interimResults = false;
   voiceChatRecognizer.maxAlternatives = 1;
   voiceChatListening = true;
-  document.getElementById('voiceOrb').className = 'voice-orb-big listening';
-  document.getElementById('voiceStatus').innerText = 'Listening...';
-  if(document.getElementById('voiceMicIcon')) document.getElementById('voiceMicIcon').className = 'fa-solid fa-stop';
+  
+  var orb = document.getElementById('voiceOrb');
+  if(orb) orb.className = 'voice-orb-big listening';
+  
+  var status = document.getElementById('voiceStatus');
+  if(status) status.innerText = 'Listening...';
+  
+  var micIcon = document.getElementById('voiceMicIcon');
+  if(micIcon) micIcon.className = 'fa-solid fa-stop';
 
   voiceChatRecognizer.onresult = function(e){
     var text = e.results[0][0].transcript;
-    document.getElementById('voiceTranscript').innerText = 'You: ' + text;
+    var transcript = document.getElementById('voiceTranscript');
+    if(transcript) transcript.innerText = 'You: ' + text;
     voiceChatSendAndSpeak(text);
   };
   voiceChatRecognizer.onerror = function(){
-    if(voiceChatActive) document.getElementById('voiceStatus').innerText = 'Tap the mic to try again';
+    if(voiceChatActive && status) status.innerText = 'Tap the mic to try again';
   };
   voiceChatRecognizer.onend = function(){
     voiceChatListening = false;
-    if(document.getElementById('voiceMicIcon')) document.getElementById('voiceMicIcon').className = 'fa-solid fa-microphone';
-    if(voiceChatActive && !speakingNow){
-      document.getElementById('voiceOrb').className = 'voice-orb-big';
+    if(micIcon) micIcon.className = 'fa-solid fa-microphone';
+    if(voiceChatActive && orb && orb.className.indexOf('listening') !== -1){
+      orb.className = 'voice-orb-big';
     }
   };
   voiceChatRecognizer.start();
@@ -108,70 +143,82 @@ function cleanForSpeech(text){
 }
 
 function buildVoicePayload(latestUserText){
+  if(typeof buildConversationPayload !== 'function') return [{role:'user', content:latestUserText}];
   var base = buildConversationPayload(latestUserText);
-  base[0] = { role:'system', content: base[0].content + " This is a LIVE voice conversation. Answer in natural, clear spoken sentences only. Be very brief (2-3 sentences)." };
+  base[0] = { 
+    role:'system', 
+    content: base[0].content + " This is a LIVE voice conversation. Answer in natural, clear spoken sentences. No markdown. Be very brief (2-3 sentences)." 
+  };
   return base;
 }
 
-// Global variables for tracking speech state
-var sentenceQueue = [];
-var speakingNow = false;
-var fullReplyText = '';
-var streamDone = false;
-
 function voiceChatSendAndSpeak(text){
   if(!voiceChatActive) return;
-  document.getElementById('voiceStatus').innerText = 'Thinking...';
-  document.getElementById('voiceOrb').className = 'voice-orb-big';
+  var status = document.getElementById('voiceStatus');
+  var orb = document.getElementById('voiceOrb');
+  var transcript = document.getElementById('voiceTranscript');
+  
+  if(status) status.innerText = 'Thinking...';
+  if(orb) orb.className = 'voice-orb-big';
 
-  saveAndAppendMessage('user', text);
+  if(typeof saveAndAppendMessage === 'function') saveAndAppendMessage('user', text);
   var id = 'ai-voice-' + Date.now();
-  appendAiPlaceholder(id);
+  if(typeof appendAiPlaceholder === 'function') appendAiPlaceholder(id);
 
   function speakReply(reply){
     var el = document.getElementById(id);
     if(el){
-      el.querySelector('.msg-body').innerHTML = renderMarkdown(reply);
+      var body = el.querySelector('.msg-body');
+      if(body && typeof renderMarkdown === 'function') body.innerHTML = renderMarkdown(reply);
       el.setAttribute('data-raw', encodeURIComponent(reply));
-      var toolsWrap = document.createElement('div');
-      toolsWrap.innerHTML = messageToolsHtml(id);
-      el.appendChild(toolsWrap.firstChild);
+      if(typeof messageToolsHtml === 'function'){
+        var toolsWrap = document.createElement('div');
+        toolsWrap.innerHTML = messageToolsHtml(id);
+        el.appendChild(toolsWrap.firstChild);
+      }
     }
-    activeChatMessages.push({sender:'ai', text:reply});
-    localStorage.setItem('jarvis_active_chat', JSON.stringify(activeChatMessages));
+    if(typeof activeChatMessages !== 'undefined') {
+      activeChatMessages.push({sender:'ai', text:reply});
+      localStorage.setItem('jarvis_active_chat', JSON.stringify(activeChatMessages));
+    }
 
     if(!voiceChatActive) return;
     var spoken = cleanForSpeech(reply);
-    document.getElementById('voiceTranscript').innerText = 'Jarvis: ' + spoken;
-    document.getElementById('voiceStatus').innerText = 'Speaking...';
-    document.getElementById('voiceOrb').className = 'voice-orb-big speaking';
+    if(transcript) transcript.innerText = 'Jarvis: ' + spoken;
+    if(status) status.innerText = 'Speaking...';
+    if(orb) orb.className = 'voice-orb-big speaking';
+    
     window.speechSynthesis.cancel();
     var utter = new SpeechSynthesisUtterance(spoken);
     utter.rate = 1.0;
-    utter.lang = detectSpeechLang(spoken);
-    var vch = pickVoiceForGender(utter.lang);
-    if(vch) utter.voice = vch;
+    if(typeof detectSpeechLang === 'function') utter.lang = detectSpeechLang(spoken);
+    if(typeof pickVoiceForGender === 'function'){
+      var vch = pickVoiceForGender(utter.lang);
+      if(vch) utter.voice = vch;
+    }
     utter.onend = function(){
       if(!voiceChatActive) return;
-      document.getElementById('voiceOrb').className = 'voice-orb-big';
-      document.getElementById('voiceStatus').innerText = 'Listening...';
+      if(orb) orb.className = 'voice-orb-big';
+      if(status) status.innerText = 'Listening...';
       setTimeout(function(){ if(voiceChatActive) voiceChatListenOnce(); }, 200);
     };
     window.speechSynthesis.speak(utter);
   }
 
-  var imagePrompt = detectImagePrompt(text);
-  if(imagePrompt){
-    handleImageGeneration(imagePrompt, id);
-    speakReply("I'm creating that image for you now.");
-    return;
+  if(typeof detectImagePrompt === 'function'){
+    var imagePrompt = detectImagePrompt(text);
+    if(imagePrompt){
+      if(typeof handleImageGeneration === 'function') handleImageGeneration(imagePrompt, id);
+      speakReply("I'm creating that image for you now.");
+      return;
+    }
   }
 
   var payload = buildVoicePayload(text);
-  sentenceQueue = [];
-  speakingNow = false;
-  fullReplyText = '';
-  streamDone = false;
+  var sentenceQueue = [];
+  var speakingNow = false;
+  var fullReplyText = '';
+  var streamDone = false;
 
   var interruptWatcher = null;
   function startInterruptWatcher(){
@@ -204,22 +251,25 @@ function voiceChatSendAndSpeak(text){
     if(speakingNow || sentenceQueue.length===0 || !voiceChatActive) return;
     speakingNow = true;
     var chunk = sentenceQueue.shift();
-    document.getElementById('voiceTranscript').innerText = 'Jarvis: ' + chunk;
-    document.getElementById('voiceStatus').innerText = 'Speaking...';
-    document.getElementById('voiceOrb').className = 'voice-orb-big speaking';
+    if(transcript) transcript.innerText = 'Jarvis: ' + chunk;
+    if(status) status.innerText = 'Speaking...';
+    if(orb) orb.className = 'voice-orb-big speaking';
+    
     var utter = new SpeechSynthesisUtterance(cleanForSpeech(chunk));
     utter.rate = 1.0;
-    utter.lang = detectSpeechLang(chunk);
-    var vch = pickVoiceForGender(utter.lang);
-    if(vch) utter.voice = vch;
+    if(typeof detectSpeechLang === 'function') utter.lang = detectSpeechLang(chunk);
+    if(typeof pickVoiceForGender === 'function'){
+      var vch = pickVoiceForGender(utter.lang);
+      if(vch) utter.voice = vch;
+    }
     utter.onend = function(){
       stopInterruptWatcher();
       speakingNow = false;
       if(sentenceQueue.length){ trySpeakNextChunk(); return; }
       if(streamDone){
         if(!voiceChatActive) return;
-        document.getElementById('voiceOrb').className = 'voice-orb-big';
-        document.getElementById('voiceStatus').innerText = 'Listening...';
+        if(orb) orb.className = 'voice-orb-big';
+        if(status) status.innerText = 'Listening...';
         setTimeout(function(){ if(voiceChatActive) voiceChatListenOnce(); }, 200);
       }
     };
@@ -228,28 +278,42 @@ function voiceChatSendAndSpeak(text){
   }
 
   var buffer = '';
-  fetch(GROQ_PROXY_URL, {
+  var proxyUrl = (typeof GROQ_PROXY_URL !== 'undefined') ? GROQ_PROXY_URL : '';
+  
+  if(!proxyUrl){
+    speakReply("Jarvis is not configured yet.");
+    return;
+  }
+
+  fetch(proxyUrl, {
     method:"POST",
     headers:{ "Content-Type":"application/json" },
-    body: JSON.stringify({ model: targetAiModel, messages: payload, max_tokens: 400, stream:true })
+    body: JSON.stringify({ 
+      model: (typeof targetAiModel !== 'undefined' ? targetAiModel : "llama-3.3-70b-versatile"), 
+      messages: payload, 
+      max_tokens: 400, 
+      stream:true 
+    })
   })
   .then(function(res){
     if(!res.body || !res.ok) throw new Error('no-stream');
     var reader = res.body.getReader();
     var decoder = new TextDecoder();
     var raw = '';
+    
+    function enqueueSentence(s){
+      s = s.trim();
+      if(!s) return;
+      sentenceQueue.push(s);
+      trySpeakNextChunk();
+    }
+
     function pump(){
       return reader.read().then(function(result){
         if(result.done){
           streamDone = true;
           if(buffer.trim()) enqueueSentence(buffer);
           if(!fullReplyText.trim()) speakReply("Sorry, I couldn't generate a reply.");
-          else {
-            var el = document.getElementById(id);
-            if(el) el.querySelector('.msg-body').innerHTML = renderMarkdown(fullReplyText);
-            activeChatMessages.push({sender:'ai', text:fullReplyText});
-            localStorage.setItem('jarvis_active_chat', JSON.stringify(activeChatMessages));
-          }
           return;
         }
         raw += decoder.decode(result.value, {stream:true});
@@ -262,7 +326,8 @@ function voiceChatSendAndSpeak(text){
           if(!jsonStr || jsonStr === '[DONE]') return;
           try{
             var obj = JSON.parse(jsonStr);
-            var piece = obj.candidates?.[0]?.content?.parts?.[0]?.text;
+            var cand = obj.candidates && obj.candidates[0];
+            var piece = cand && cand.content && cand.content.parts && cand.content.parts[0] && cand.content.parts[0].text;
             if(piece){
               fullReplyText += piece;
               buffer += piece;
@@ -276,12 +341,6 @@ function voiceChatSendAndSpeak(text){
         });
         return pump();
       });
-    }
-    function enqueueSentence(s){
-      s = s.trim();
-      if(!s) return;
-      sentenceQueue.push(s);
-      trySpeakNextChunk();
     }
     return pump();
   })
