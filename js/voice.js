@@ -1,4 +1,19 @@
 /* =====================================================
+   GLOBAL STATE FOR VOICE
+   ===================================================== */
+// Point 1 & 2: Defining missing global variables
+if (typeof recognizer === 'undefined') var recognizer = null;
+if (typeof isListening === 'undefined') var isListening = false;
+if (typeof voiceChatRecognizer === 'undefined') var voiceChatRecognizer = null;
+if (typeof voiceChatActive === 'undefined') var voiceChatActive = false;
+if (typeof voiceChatListening === 'undefined') var voiceChatListening = false;
+
+var speakingNow = false;
+var sentenceQueue = [];
+var fullReplyText = '';
+var streamDone = false;
+
+/* =====================================================
    VOICE INPUT (Main Chat Mic)
    ===================================================== */
 function startVoiceInput(){
@@ -7,13 +22,20 @@ function startVoiceInput(){
     if(typeof showToast === 'function') showToast('Voice input not supported'); 
     return; 
   }
-  if(typeof isListening !== 'undefined' && isListening){ 
-    if(recognizer && typeof recognizer.stop === 'function') recognizer.stop(); 
+
+  // Point 3: Use abort() and reset state properly
+  if(isListening){ 
+    if(recognizer) {
+      try { recognizer.abort(); } catch(e) {}
+    }
+    isListening = false;
+    document.getElementById('micBtn').classList.remove('mic-active');
     return; 
   }
   
   recognizer = new SR();
-  recognizer.lang = 'en-IN';
+  // Point 8: Better language support
+  recognizer.lang = 'en-IN'; 
   recognizer.interimResults = false;
   recognizer.maxAlternatives = 1;
   isListening = true;
@@ -27,21 +49,30 @@ function startVoiceInput(){
     var input = document.getElementById('appInputBox');
     if(input) input.value = text;
   };
-  recognizer.onerror = function(){ 
-    if(typeof showToast === 'function') showToast('Could not hear you'); 
+
+  // Point 7: Detailed Error Logging
+  recognizer.onerror = function(e){ 
+    console.error("Speech Recognition Error:", e.error);
+    if(e.error === 'not-allowed') showToast('Mic permission denied');
+    else if(typeof showToast === 'function') showToast('Could not hear you'); 
   };
+
   recognizer.onend = function(){ 
     isListening = false; 
     if(micBtn) micBtn.classList.remove('mic-active'); 
   };
-  recognizer.start();
+  
+  try {
+    recognizer.start();
+  } catch(e) {
+    console.error("Start Error:", e);
+    isListening = false;
+  }
 }
 
 /* =====================================================
    VOICE CHAT MODE — continuous spoken back-and-forth
    ===================================================== */
-var voiceChatRecognizer = null, voiceChatActive = false, voiceChatListening = false;
-
 function openVoiceChat(){
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if(!SR){ 
@@ -61,13 +92,18 @@ function openVoiceChat(){
   var orb = document.getElementById('voiceOrb');
   if(orb) orb.className = 'voice-orb-big';
   
+  // Point 4: Triggered by user click (openVoiceChat is called by button)
   voiceChatListenOnce();
 }
 
 function closeVoiceChat(){
   voiceChatActive = false;
   window.speechSynthesis.cancel();
-  if(voiceChatRecognizer){ try{ voiceChatRecognizer.stop(); }catch(e){} }
+  // Point 5: Abort existing recognizer
+  if(voiceChatRecognizer){ 
+    try{ voiceChatRecognizer.abort(); }catch(e){} 
+    voiceChatRecognizer = null;
+  }
   voiceChatListening = false;
   var overlay = document.getElementById('voiceOverlay');
   if(overlay) overlay.classList.remove('show');
@@ -80,7 +116,9 @@ function voiceChatToggleListen(){
     return;
   }
   if(voiceChatListening){
-    if(voiceChatRecognizer) voiceChatRecognizer.stop();
+    if(voiceChatRecognizer) {
+      try { voiceChatRecognizer.abort(); } catch(e) {}
+    }
     return;
   }
   voiceChatListenOnce();
@@ -89,6 +127,12 @@ function voiceChatToggleListen(){
 function voiceChatListenOnce(){
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if(!SR || !voiceChatActive) return;
+
+  // Point 5: Abort existing before creating new
+  if(voiceChatRecognizer) {
+    try { voiceChatRecognizer.abort(); } catch(e) {}
+  }
+
   window.speechSynthesis.cancel();
   voiceChatRecognizer = new SR();
   voiceChatRecognizer.lang = 'en-IN';
@@ -111,17 +155,25 @@ function voiceChatListenOnce(){
     if(transcript) transcript.innerText = 'You: ' + text;
     voiceChatSendAndSpeak(text);
   };
-  voiceChatRecognizer.onerror = function(){
+
+  voiceChatRecognizer.onerror = function(e){
+    console.error("Voice Chat Error:", e.error);
     if(voiceChatActive && status) status.innerText = 'Tap the mic to try again';
   };
+
   voiceChatRecognizer.onend = function(){
     voiceChatListening = false;
     if(micIcon) micIcon.className = 'fa-solid fa-microphone';
-    if(voiceChatActive && orb && orb.className.indexOf('listening') !== -1){
+    if(voiceChatActive && !speakingNow && orb){
       orb.className = 'voice-orb-big';
     }
   };
-  voiceChatRecognizer.start();
+
+  try {
+    voiceChatRecognizer.start();
+  } catch(e) {
+    console.error("Voice Chat Start Error:", e);
+  }
 }
 
 function cleanForSpeech(text){
@@ -192,33 +244,34 @@ function voiceChatSendAndSpeak(text){
     var utter = new SpeechSynthesisUtterance(spoken);
     utter.rate = 1.0;
     if(typeof detectSpeechLang === 'function') utter.lang = detectSpeechLang(spoken);
-    if(typeof pickVoiceForGender === 'function'){
-      var vch = pickVoiceForGender(utter.lang);
-      if(vch) utter.voice = vch;
-    }
+    
+    // Point 6: Start listening ONLY after speech is done
     utter.onend = function(){
+      speakingNow = false;
       if(!voiceChatActive) return;
       if(orb) orb.className = 'voice-orb-big';
       if(status) status.innerText = 'Listening...';
-      setTimeout(function(){ if(voiceChatActive) voiceChatListenOnce(); }, 200);
+      setTimeout(function(){ 
+        if(voiceChatActive && !speakingNow) voiceChatListenOnce(); 
+      }, 300);
     };
+    
+    speakingNow = true;
     window.speechSynthesis.speak(utter);
   }
 
-  if(typeof detectImagePrompt === 'function'){
-    var imagePrompt = detectImagePrompt(text);
-    if(imagePrompt){
-      if(typeof handleImageGeneration === 'function') handleImageGeneration(imagePrompt, id);
-      speakReply("I'm creating that image for you now.");
-      return;
-    }
+  var imagePrompt = (typeof detectImagePrompt === 'function') ? detectImagePrompt(text) : null;
+  if(imagePrompt){
+    if(typeof handleImageGeneration === 'function') handleImageGeneration(imagePrompt, id);
+    speakReply("I'm creating that image for you now.");
+    return;
   }
 
   var payload = buildVoicePayload(text);
-  var sentenceQueue = [];
-  var speakingNow = false;
-  var fullReplyText = '';
-  var streamDone = false;
+  sentenceQueue = [];
+  speakingNow = false;
+  fullReplyText = '';
+  streamDone = false;
 
   var interruptWatcher = null;
   function startInterruptWatcher(){
@@ -244,12 +297,12 @@ function voiceChatSendAndSpeak(text){
     }catch(e){ interruptWatcher = null; }
   }
   function stopInterruptWatcher(){
-    if(interruptWatcher){ try{ interruptWatcher.stop(); }catch(e){} interruptWatcher = null; }
+    if(interruptWatcher){ try{ interruptWatcher.abort(); }catch(e){} interruptWatcher = null; }
   }
 
   function trySpeakNextChunk(){
     if(speakingNow || sentenceQueue.length===0 || !voiceChatActive) return;
-    speakingNow = true;
+    
     var chunk = sentenceQueue.shift();
     if(transcript) transcript.innerText = 'Jarvis: ' + chunk;
     if(status) status.innerText = 'Speaking...';
@@ -258,28 +311,26 @@ function voiceChatSendAndSpeak(text){
     var utter = new SpeechSynthesisUtterance(cleanForSpeech(chunk));
     utter.rate = 1.0;
     if(typeof detectSpeechLang === 'function') utter.lang = detectSpeechLang(chunk);
-    if(typeof pickVoiceForGender === 'function'){
-      var vch = pickVoiceForGender(utter.lang);
-      if(vch) utter.voice = vch;
-    }
+    
     utter.onend = function(){
       stopInterruptWatcher();
       speakingNow = false;
-      if(sentenceQueue.length){ trySpeakNextChunk(); return; }
-      if(streamDone){
+      if(sentenceQueue.length){ 
+        trySpeakNextChunk(); 
+      } else if(streamDone){
         if(!voiceChatActive) return;
         if(orb) orb.className = 'voice-orb-big';
         if(status) status.innerText = 'Listening...';
-        setTimeout(function(){ if(voiceChatActive) voiceChatListenOnce(); }, 200);
+        setTimeout(function(){ if(voiceChatActive && !speakingNow) voiceChatListenOnce(); }, 300);
       }
     };
+    
+    speakingNow = true;
     window.speechSynthesis.speak(utter);
     startInterruptWatcher();
   }
 
-  var buffer = '';
   var proxyUrl = (typeof GROQ_PROXY_URL !== 'undefined') ? GROQ_PROXY_URL : '';
-  
   if(!proxyUrl){
     speakReply("Jarvis is not configured yet.");
     return;
@@ -326,8 +377,7 @@ function voiceChatSendAndSpeak(text){
           if(!jsonStr || jsonStr === '[DONE]') return;
           try{
             var obj = JSON.parse(jsonStr);
-            var cand = obj.candidates && obj.candidates[0];
-            var piece = cand && cand.content && cand.content.parts && cand.content.parts[0] && cand.content.parts[0].text;
+            var piece = obj.candidates && obj.candidates[0] && obj.candidates[0].content && obj.candidates[0].content.parts && obj.candidates[0].content.parts[0] && obj.candidates[0].content.parts[0].text;
             if(piece){
               fullReplyText += piece;
               buffer += piece;
@@ -345,6 +395,8 @@ function voiceChatSendAndSpeak(text){
     return pump();
   })
   .catch(function(err){
+    console.error("Fetch Error:", err);
     speakReply("Connection lost. Please try again.");
   });
-}
+     }
+                  
