@@ -1,5 +1,5 @@
 /* =====================================================
-   ADVANCED VOICE CHAT (CHATGPT STYLE)
+   JARVIS PRO - LIVE VOICE CHAT (COMPLETE BLOCK)
    ===================================================== */
 var voiceChatRecognizer = null, voiceChatActive = false, voiceChatListening = false;
 var interruptWatcher = null, speakingNow = false, streamDone = false;
@@ -8,12 +8,12 @@ var fullReplyText = '', currentBuffer = '';
 
 function openVoiceChat() {
     var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) { showToast('Voice chat not supported in this browser'); return; }
+    if (!SR) { showToast('Voice chat not supported'); return; }
     voiceChatActive = true;
     document.getElementById('voiceOverlay').classList.add('show');
     document.getElementById('voiceStatus').innerText = 'Jarvis is ready. Start talking...';
     document.getElementById('voiceOrb').className = 'voice-orb-big';
-    voiceChatListenOnce(); // Start listening automatically
+    voiceChatListenOnce();
 }
 
 function closeVoiceChat() {
@@ -25,13 +25,29 @@ function closeVoiceChat() {
     document.getElementById('voiceOverlay').classList.remove('show');
 }
 
+// --- Yeh wahi missing function hai ---
+function voiceChatToggleListen() {
+    if (window.speechSynthesis && window.speechSynthesis.speaking) {
+        window.speechSynthesis.cancel();
+        speakingNow = false;
+        sentenceQueue = [];
+        voiceChatListenOnce();
+        return;
+    }
+    if (voiceChatListening) {
+        if (voiceChatRecognizer) voiceChatRecognizer.stop();
+        return;
+    }
+    voiceChatListenOnce();
+}
+
 function voiceChatListenOnce() {
     var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR || !voiceChatActive) return;
     window.speechSynthesis.cancel();
     voiceChatListening = true;
     voiceChatRecognizer = new SR();
-    voiceChatRecognizer.lang = 'en-IN'; // Aap ise 'hi-IN' bhi kar sakte hain Hindi ke liye
+    voiceChatRecognizer.lang = 'en-IN';
     voiceChatRecognizer.interimResults = false;
     
     document.getElementById('voiceOrb').className = 'voice-orb-big listening';
@@ -44,7 +60,7 @@ function voiceChatListenOnce() {
     };
 
     voiceChatRecognizer.onerror = function() {
-        if(voiceChatActive) document.getElementById('voiceStatus').innerText = 'Tap to speak...';
+        if(voiceChatActive) document.getElementById('voiceStatus').innerText = 'Tap mic to speak...';
     };
 
     voiceChatRecognizer.onend = function() {
@@ -59,9 +75,10 @@ function voiceChatSendAndSpeak(text) {
     document.getElementById('voiceStatus').innerText = 'Thinking...';
     document.getElementById('voiceOrb').className = 'voice-orb-big';
     
-    saveAndAppendMessage('user', text);
+    // UI Update
+    if(typeof saveAndAppendMessage === 'function') saveAndAppendMessage('user', text);
     var id = 'ai-voice-' + Date.now();
-    appendAiPlaceholder(id);
+    if(typeof appendAiPlaceholder === 'function') appendAiPlaceholder(id);
 
     fullReplyText = ''; currentBuffer = '';
     sentenceQueue = []; speakingNow = false; streamDone = false;
@@ -97,7 +114,6 @@ function voiceChatSendAndSpeak(text) {
                         if (piece) {
                             fullReplyText += piece;
                             currentBuffer += piece;
-                            // Faster splitting: Detect end of thought
                             let match = currentBuffer.match(/^(.*?[.!?।\n,])\s+/);
                             if (match) {
                                 enqueueSentence(match[1]);
@@ -108,13 +124,13 @@ function voiceChatSendAndSpeak(text) {
                 }
             }
         }
-        // Update chat UI at the end
+        // Final UI Update
         var el = document.getElementById(id);
-        if(el) el.querySelector('.msg-body').innerHTML = renderMarkdown(fullReplyText);
+        if(el && typeof renderMarkdown === 'function') el.querySelector('.msg-body').innerHTML = renderMarkdown(fullReplyText);
     })
     .catch(err => {
         console.error(err);
-        speakText("I'm having trouble connecting right now.");
+        document.getElementById('voiceStatus').innerText = 'Connection Error';
     });
 }
 
@@ -141,9 +157,14 @@ function speakNextFromQueue() {
 
     let utter = new SpeechSynthesisUtterance(cleanText);
     utter.rate = 1.0; 
-    utter.pitch = 1.0;
-    utter.lang = detectSpeechLang(cleanText);
+    utter.lang = (typeof detectSpeechLang === 'function') ? detectSpeechLang(cleanText) : 'en-IN';
     
+    // Voice Selection
+    if(typeof pickVoiceForGender === 'function') {
+        var vch = pickVoiceForGender(utter.lang);
+        if(vch) utter.voice = vch;
+    }
+
     utter.onstart = () => { startInterruptWatcher(); };
     utter.onend = () => {
         stopInterruptWatcher();
@@ -162,12 +183,12 @@ function startInterruptWatcher() {
         interruptWatcher.interimResults = true;
         interruptWatcher.onresult = function(e) {
             let heard = e.results[e.results.length - 1][0].transcript.trim();
-            if (heard.split(' ').length >= 2) { // User spoke at least 2 words
+            if (heard.split(' ').length >= 2) { 
                 window.speechSynthesis.cancel();
                 sentenceQueue = [];
                 speakingNow = false;
                 stopInterruptWatcher();
-                voiceChatListenOnce(); // Start listening to user again
+                voiceChatListenOnce(); 
             }
         };
         interruptWatcher.start();
@@ -177,20 +198,3 @@ function startInterruptWatcher() {
 function stopInterruptWatcher() {
     if (interruptWatcher) { try { interruptWatcher.stop(); } catch (e) { } interruptWatcher = null; }
        }
-function voiceChatToggleListen() {
-    // Agar Jarvis bol raha hai, toh use chup karao aur sunna shuru karo
-    if (window.speechSynthesis && window.speechSynthesis.speaking) {
-        window.speechSynthesis.cancel();
-        speakingNow = false;
-        sentenceQueue = [];
-        voiceChatListenOnce();
-        return;
-    }
-    // Agar pehle se sun raha hai, toh stop karo
-    if (voiceChatListening) {
-        if (voiceChatRecognizer) voiceChatRecognizer.stop();
-        return;
-    }
-    // Varna sunna shuru karo
-    voiceChatListenOnce();
-}
