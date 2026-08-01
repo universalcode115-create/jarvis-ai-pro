@@ -1,6 +1,39 @@
 /* =====================================================
-   JARVIS PRO - LIVE VOICE CHAT (COMPLETE BLOCK)
+   JARVIS PRO - ULTRA LIVE VOICE CHAT (STABLE VERSION)
    ===================================================== */
+
+// --- HELPER FUNCTIONS (Zaroori hain) ---
+function cleanForSpeech(text) {
+    return text
+        .replace(/\*\*\*(.*?)\*\*\*/g, '$1')
+        .replace(/\*\*(.*?)\*\*/g, '$1')
+        .replace(/\*(.*?)\*/g, '$1')
+        .replace(/__(.*?)__/g, '$1')
+        .replace(/_(.*?)_/g, '$1')
+        .replace(/`{1,3}[^`]*`{1,3}/g, function(m) { return m.replace(/`/g, ''); })
+        .replace(/^#{1,6}\s+/gm, '')
+        .replace(/^[-*•]\s+/gm, '')
+        .replace(/^\d+\.\s+/gm, '')
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+        .replace(/\n{2,}/g, '. ')
+        .replace(/\n/g, ' ')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
+}
+
+function buildVoicePayload(latestUserText) {
+    var base = (typeof buildConversationPayload === 'function') ? buildConversationPayload(latestUserText) : [{role:'user', content: latestUserText}];
+    var systemPrompt = "This is a spoken voice conversation. Answer in natural, clear spoken sentences only. No markdown, no bullet points. Be brief (2-5 sentences).";
+    
+    if(base[0].role === 'system') {
+        base[0].content += " " + systemPrompt;
+    } else {
+        base.unshift({role: 'system', content: systemPrompt});
+    }
+    return base;
+}
+
+// --- MAIN VOICE CHAT LOGIC ---
 var voiceChatRecognizer = null, voiceChatActive = false, voiceChatListening = false;
 var interruptWatcher = null, speakingNow = false, streamDone = false;
 var sentenceQueue = [];
@@ -8,11 +41,10 @@ var fullReplyText = '', currentBuffer = '';
 
 function openVoiceChat() {
     var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) { showToast('Voice chat not supported'); return; }
+    if (!SR) { alert('Voice chat not supported'); return; }
     voiceChatActive = true;
     document.getElementById('voiceOverlay').classList.add('show');
-    document.getElementById('voiceStatus').innerText = 'Jarvis is ready. Start talking...';
-    document.getElementById('voiceOrb').className = 'voice-orb-big';
+    document.getElementById('voiceStatus').innerText = 'Jarvis is ready...';
     voiceChatListenOnce();
 }
 
@@ -25,7 +57,6 @@ function closeVoiceChat() {
     document.getElementById('voiceOverlay').classList.remove('show');
 }
 
-// --- Yeh wahi missing function hai ---
 function voiceChatToggleListen() {
     if (window.speechSynthesis && window.speechSynthesis.speaking) {
         window.speechSynthesis.cancel();
@@ -60,7 +91,7 @@ function voiceChatListenOnce() {
     };
 
     voiceChatRecognizer.onerror = function() {
-        if(voiceChatActive) document.getElementById('voiceStatus').innerText = 'Tap mic to speak...';
+        if(voiceChatActive) document.getElementById('voiceStatus').innerText = 'Tap to speak...';
     };
 
     voiceChatRecognizer.onend = function() {
@@ -75,7 +106,6 @@ function voiceChatSendAndSpeak(text) {
     document.getElementById('voiceStatus').innerText = 'Thinking...';
     document.getElementById('voiceOrb').className = 'voice-orb-big';
     
-    // UI Update
     if(typeof saveAndAppendMessage === 'function') saveAndAppendMessage('user', text);
     var id = 'ai-voice-' + Date.now();
     if(typeof appendAiPlaceholder === 'function') appendAiPlaceholder(id);
@@ -124,13 +154,11 @@ function voiceChatSendAndSpeak(text) {
                 }
             }
         }
-        // Final UI Update
         var el = document.getElementById(id);
         if(el && typeof renderMarkdown === 'function') el.querySelector('.msg-body').innerHTML = renderMarkdown(fullReplyText);
     })
     .catch(err => {
-        console.error(err);
-        document.getElementById('voiceStatus').innerText = 'Connection Error';
+        document.getElementById('voiceStatus').innerText = 'Error connecting...';
     });
 }
 
@@ -159,7 +187,6 @@ function speakNextFromQueue() {
     utter.rate = 1.0; 
     utter.lang = (typeof detectSpeechLang === 'function') ? detectSpeechLang(cleanText) : 'en-IN';
     
-    // Voice Selection
     if(typeof pickVoiceForGender === 'function') {
         var vch = pickVoiceForGender(utter.lang);
         if(vch) utter.voice = vch;
@@ -198,3 +225,4 @@ function startInterruptWatcher() {
 function stopInterruptWatcher() {
     if (interruptWatcher) { try { interruptWatcher.stop(); } catch (e) { } interruptWatcher = null; }
        }
+           
