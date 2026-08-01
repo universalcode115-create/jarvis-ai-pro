@@ -177,3 +177,20 @@ function startInterruptWatcher() {
 function stopInterruptWatcher() {
     if (interruptWatcher) { try { interruptWatcher.stop(); } catch (e) { } interruptWatcher = null; }
        }
+function voiceChatToggleListen() {
+    // Agar Jarvis bol raha hai, toh use chup karao aur sunna shuru karo
+    if (window.speechSynthesis && window.speechSynthesis.speaking) {
+        window.speechSynthesis.cancel();
+        speakingNow = false;
+        sentenceQueue = [];
+        voiceChatListenOnce();
+        return;
+    }
+    // Agar pehle se sun raha hai, toh stop karo
+    if (voiceChatListening) {
+        if (voiceChatRecognizer) voiceChatRecognizer.stop();
+        return;
+    }
+    // Varna sunna shuru karo
+    voiceChatListenOnce();
+}
