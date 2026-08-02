@@ -5,6 +5,7 @@
 
 // API Endpoint (Agar aap direct Groq use kar rahe hain toh yahan URL set karein)
 var CHAT_PROXY_URL = (typeof GROQ_PROXY_URL !== 'undefined') ? GROQ_PROXY_URL : 'https://api.groq.com/openai/v1/chat/completions';
+https://jarvis-groq-proxy.rk24363ywhsh.workers.dev/
 // Note: Direct Groq API use karne ke liye aapko headers me Authorization: 'Bearer YOUR_API_KEY' dena padta hai. 
 // Agar aapka apna backend proxy hai, toh wahi URL rehne dein.
 
